@@ -144,6 +144,8 @@ ssh-keygen -t ed25519 -C "forextale-deploy" -f deploy_key
 | `deploy_key.pub` | 公钥（锁） | 装到服务器上（第 2 步） |
 | `deploy_key` | 私钥（钥匙） | 内容粘进 GitHub（第 4 步），文件本体建议移到 `C:\Users\你的用户名\.ssh\` 保管 |
 
+> 不小心给密钥设了密码？CI 无法输入密码会部署失败。用 `ssh-keygen -p -f .\deploy_key` 移除（旧密码 → 新密码两次直接回车），然后**重新复制私钥粘进 GitHub Secret**；公钥不变，服务器无需任何改动。
+
 ### 第 2 步：把公钥装上服务器
 
 ```powershell
