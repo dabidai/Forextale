@@ -126,58 +126,99 @@ cp /opt/forextale/data/forextale.db ~/backup/forextale-$(date +%F).db
 
 ## 10. 自动部署（GitHub → 服务器）
 
-仓库里已内置工作流文件 `.github/workflows/deploy.yml`：每次 push 到 `main` 分支，GitHub 会自动跑冒烟测试 → 通过后用 rsync 把代码同步到服务器并重启服务（约 30 秒上线）。玩家数据库 `data/forextale.db` 在同步排除名单里，**永远不会被部署覆盖**。
+工作流 `.github/workflows/deploy.yml` 已内置：push 到 `main` → 自动跑测试 → rsync 同步代码到服务器 → 重启服务（约 30 秒上线）。玩家数据库 `data/forextale.db` 永远不会被部署覆盖。
 
-一次性配置（共 5 步）：
+下面是零基础全流程。约定：`user` = 你登录服务器的用户名，`你的服务器IP` = 服务器地址。全程在 **Windows PowerShell** 中执行（Linux/Mac 把安装公钥那条换成 `ssh-copy-id -i deploy_key.pub user@IP` 即可）。
 
-1. **准备部署密钥**（在任意机器执行，一路回车不设密码）：
+### 第 1 步：生成一对部署密钥
 
-   ```bash
-   ssh-keygen -t ed25519 -C "forextale-deploy" -f deploy_key
-   # 把公钥追加到服务器部署用户的 authorized_keys（user 换成你的 SSH 用户名）
-   ssh-copy-id -i deploy_key.pub user@你的服务器IP
-   # 服务器上确认 rsync 已安装
-   sudo apt install rsync
-   ```
+```powershell
+cd D:\Code\Forextale        # 或任何你想放密钥的目录
+ssh-keygen -t ed25519 -C "forextale-deploy" -f deploy_key
+```
 
-   私钥 `deploy_key` 留在本地，下一步粘贴进 GitHub；用完可删除。
+一路回车（不设密码）。完成后目录里多出两个文件：
 
-   **Windows PowerShell 用户**（自带 ssh-keygen，但**没有** `ssh-copy-id`，装公钥用这条替代）：
+| 文件 | 是什么 | 去向 |
+|---|---|---|
+| `deploy_key.pub` | 公钥（锁） | 装到服务器上（第 2 步） |
+| `deploy_key` | 私钥（钥匙） | 内容粘进 GitHub（第 4 步），文件本体建议移到 `C:\Users\你的用户名\.ssh\` 保管 |
 
-   ```powershell
-   ssh-keygen -t ed25519 -C "forextale-deploy" -f deploy_key
-   Get-Content .\deploy_key.pub | ssh user@你的服务器IP "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
-   # 把私钥复制到剪贴板，直接粘进 GitHub Secrets：
-   Get-Content .\deploy_key | Set-Clipboard
-   ```
+### 第 2 步：把公钥装上服务器
 
-   若提示找不到 ssh-keygen：管理员 PowerShell 执行 `Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0` 安装（或装 Git for Windows，自带 OpenSSH）。
+```powershell
+Get-Content .\deploy_key.pub | ssh user@你的服务器IP "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
+```
 
-2. **服务器上允许部署账号免密重启服务**（最小权限，只放行重启这一条命令；若直接用 root 登录可跳过）：
+这条命令会**最后输一次服务器密码**（以后就不再需要了）。装完立即验证：
 
-   ```bash
-   echo "user ALL=(root) NOPASSWD: /usr/bin/systemctl restart forextale" | sudo tee /etc/sudoers.d/forextale-deploy
-   sudo chmod 440 /etc/sudoers.d/forextale-deploy
-   ```
+```powershell
+ssh -i .\deploy_key user@你的服务器IP "echo 免密登录成功"
+```
 
-3. **GitHub 仓库配置 3 个 Secret**：仓库页 → Settings → Secrets and variables → Actions → New repository secret：
+输出「免密登录成功」且**没有要求密码** = 成功。若仍要求密码：检查服务器上 `~/.ssh` 权限是否 700、`authorized_keys` 是否 600、用户名有没有写错。
 
-   | Secret 名 | 值 |
-   |---|---|
-   | `SSH_PRIVATE_KEY` | `deploy_key` 私钥全文（含 BEGIN/END 两行） |
-   | `SERVER_HOST` | 服务器 IP 或域名 |
-   | `SERVER_USER` | SSH 登录用户名 |
+### 第 3 步：服务器收尾（rsync + 免密重启权限）
 
-4. **首次推送代码**（本机）：
+```powershell
+ssh -i .\deploy_key user@你的服务器IP
+# —— 进入服务器后执行：——
+sudo apt install -y rsync
+echo "user ALL=(root) NOPASSWD: /usr/bin/systemctl restart forextale" | sudo tee /etc/sudoers.d/forextale-deploy
+sudo chmod 440 /etc/sudoers.d/forextale-deploy
+exit
+```
 
-   ```bash
-   git init && git add . && git commit -m "init"
-   git branch -M main
-   git remote add origin https://github.com/你的用户名/forextale.git
-   git push -u origin main
-   ```
+说明：sudoers 命令里的 `user` 要改成**第 2 步 ssh 命令里用的那个用户名**（两处）；若你直接用 root 登录服务器，这一步整个跳过。这条规则只放行「重启 forextale 服务」一条命令，CI 拿着密钥也做不了别的事。
 
-5. **完成**。此后每次 `git push` 自动部署；仓库 Actions 页可看实时日志，也可手动触发（workflow_dispatch）。
+### 第 4 步：把三个秘密配置进 GitHub
 
-> 注意：确保第 4 节的 systemd 服务已就位（工作流只负责同步与重启，服务安装是第 2–4 节的一次性工作）；`.gitignore` 已把 `data/` 排除在 Git 之外，玩家数据不会被误提交。
+先把私钥内容复制到剪贴板：
+
+```powershell
+Get-Content .\deploy_key | Set-Clipboard
+```
+
+打开浏览器：`github.com/你的GitHub用户名/forextale` → **Settings** → 左侧 **Secrets and variables** → **Actions** → 绿色按钮 **New repository secret**，依次添加三条（每条填 Name 和 Value 后点 Add secret）：
+
+| Name（原样填写，含下划线） | Value |
+|---|---|
+| `SSH_PRIVATE_KEY` | 刚才剪贴板里的私钥全文（包含 `-----BEGIN` 和 `-----END` 两行） |
+| `SERVER_HOST` | 服务器 IP（如 `123.45.67.89`）或域名 |
+| `SERVER_USER` | 第 2 步 ssh 命令里用的用户名 |
+
+### 第 5 步：创建 GitHub 仓库并首推
+
+1. 打开 `github.com/new` → Repository name 填 `forextale` → 选 **Private** → **不要勾选**任何初始化选项（README、.gitignore 都不勾）→ Create repository；
+2. 回到 PowerShell：
+
+```powershell
+cd D:\Code\Forextale
+git config --global user.name "你的名字"      # 本机首次使用 git 才需要这两行
+git config --global user.email "你的邮箱"
+git branch -M main
+git remote add origin https://github.com/你的GitHub用户名/forextale.git
+git push -u origin main
+```
+
+（本目录已 `git init` 并有提交，直接推即可。）
+
+### 第 6 步：验证自动部署
+
+1. 推送后打开仓库的 **Actions** 标签页，会看到一次 `Deploy` 运行，点进去看日志：测试全绿 → rsync 文件清单 → `systemctl restart` → `active`；
+2. 浏览器打开 `http://你的服务器IP`（或你的域名）——已经是最新版本；
+3. 之后的日常就是：改代码 → `git add .` → `git commit -m "说明"` → `git push`，30 秒后线上生效。
+
+### 排错对照表（对照 Actions 日志）
+
+| 报错 | 原因与处理 |
+|---|---|
+| `Permission denied (publickey)` | 公钥没装对：重做第 2 步；或 `SERVER_USER` 与第 2 步的用户名不一致 |
+| 读私钥时报 `invalid format` | 私钥混入了 Windows 换行符——工作流已自动容错，仍报错就重新复制私钥全文（勿手动增删行） |
+| `sudo: a password is required` | 第 3 步 sudoers 里的用户名和 `SERVER_USER` 不一致 |
+| `rsync: command not found` | 服务器没装 rsync：`sudo apt install -y rsync` |
+| `Connection timed out` | 云安全组/防火墙没放行 22 端口 |
+| 测试没过、部署被跳过 | 本地先跑 `node tests/smoke.mjs`，修完再推 |
+
+> 提醒：`data/forextale.db`（玩家数据）在同步排除名单里，部署永不覆盖；`.gitignore` 也保证它不会被推上 GitHub。
 
