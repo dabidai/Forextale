@@ -291,7 +291,19 @@ const ok = (name) => console.log(`  ✓ ${name} (#${++n})`);
   db.sync('token-aaaa-1111', 10500, 7, now + 9);
   assert.equal(db.getPlayer('token-aaaa-1111').best, 11000, '回撤不动巅峰');
   assert.equal(db.rankOf(10500), 3);
-  ok('龙虎榜：注册/改名/同步保留巅峰/按当前权益实时排名 ✓');
+  // 巅峰榜（按 best）与实时榜（按 last）是两套排序
+  assert.deepEqual(
+    db.topFor(50, null, true).map((r) => r.name),
+    ['索罗斯门徒', '小明二代', '英镑猎手'],
+    '巅峰榜：小明凭 11000 历史新高排第二',
+  );
+  assert.deepEqual(
+    db.topFor(50, null).map((r) => r.name),
+    ['索罗斯门徒', '英镑猎手', '小明二代'],
+    '实时榜：小明当前 10500 垫底',
+  );
+  assert.equal(db.rankOfBest(11000), 2);
+  ok('龙虎榜：注册/改名/同步保留巅峰/实时榜与巅峰榜双排序 ✓');
 }
 
 /* 19. 金额 ⇄ 手数换算 */

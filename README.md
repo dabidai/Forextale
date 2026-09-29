@@ -24,7 +24,7 @@ ESM 模块不能直接双击 HTML 打开，需要静态服务器。
 |---|---|---|
 | `/api/player` | POST | 注册/改名 `{name, token?}` → `{token, rank, total}` |
 | `/api/sync` | POST | 上报 `{token, equity, trades}`；实时榜按当前权益排名，同时保留历史最高 |
-| `/api/leaderboard` | GET | `?token=` 可选，返回前 50 名 + 我的排名（打开弹窗时每 2 秒轮询） |
+| `/api/leaderboard` | GET | `?token=` 可选，返回前 50 名 + 我的排名；`?board=best` 切巅峰榜（默认实时榜，弹窗内 2 秒轮询） |
 
 ## 结构
 

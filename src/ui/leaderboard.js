@@ -53,7 +53,8 @@ export async function syncScore(equity, trades, open = false) {
 }
 
 async function fetchBoard(token) {
-  const res = await fetch('/api/leaderboard' + (token ? `?token=${encodeURIComponent(token)}` : ''));
+  const q = curBoard === 'best' ? '?board=best&' : '?';
+  const res = await fetch('/api/leaderboard' + q + (token ? `token=${encodeURIComponent(token)}` : ''));
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || '加载失败');
   return data;
@@ -62,9 +63,10 @@ async function fetchBoard(token) {
 /* ---------- 弹窗 UI ---------- */
 
 let refreshTimer = null;
+let curBoard = 'live'; // 'live' 实时榜（按当前权益） | 'best' 巅峰榜（按历史最高）
 let getStats = () => ({ equity: 10000, trades: 0, open: false });
 
-function rowEl(r, i) {
+function rowEl(r, i, byBest) {
   const stale = Date.now() - r.updated_at > 30000; // 超过 30s 没心跳视为离线，权益冻结在最后一次上报
   const div = document.createElement('div');
   div.className = 'board-row' + (r.mine ? ' me' : '') + (stale ? ' offline' : '');
@@ -83,12 +85,18 @@ function rowEl(r, i) {
   left.append(rk, nm);
   const right = document.createElement('div');
   right.className = 'br-r';
-  const cur = document.createElement('b');
-  cur.textContent = fmt$(r.last);
+  const main = document.createElement('b');
   const sub = document.createElement('span');
-  sub.className = 'br-sub' + (pnl >= 0 ? ' up' : ' down');
-  sub.textContent = `${fmt$(pnl)} · 巅峰 ${fmt$(r.best)} · ${r.trades}笔 · ${tm}${stale ? ' · 离线' : ''}`;
-  right.append(cur, sub);
+  if (byBest) {
+    main.textContent = fmt$(r.best);
+    sub.className = 'br-sub' + (pnl >= 0 ? ' up' : ' down');
+    sub.textContent = `当前 ${fmt$(r.last)} · ${r.trades}笔 · ${tm}${stale ? ' · 离线' : ''}`;
+  } else {
+    main.textContent = fmt$(r.last);
+    sub.className = 'br-sub' + (pnl >= 0 ? ' up' : ' down');
+    sub.textContent = `${fmt$(pnl)} · 巅峰 ${fmt$(r.best)} · ${r.trades}笔 · ${tm}${stale ? ' · 离线' : ''}`;
+  }
+  right.append(main, sub);
   div.append(left, right);
   return div;
 }
@@ -96,6 +104,7 @@ function rowEl(r, i) {
 async function refreshBoard() {
   const p = getPlayer();
   const box = $('boardList');
+  const byBest = curBoard === 'best';
   try {
     const data = await fetchBoard(p?.token);
     box.textContent = '';
@@ -103,13 +112,16 @@ async function refreshBoard() {
       box.textContent = '还没有人上榜，第一名就是你';
       return;
     }
-    data.list.forEach((r, i) => box.appendChild(rowEl(r, i)));
+    data.list.forEach((r, i) => box.appendChild(rowEl(r, i, byBest)));
     $('boardMe').classList.toggle('hide', !data.me);
     if (data.me) {
-      $('boardMe').textContent =
-        `我：${data.me.name} ｜ No.${data.me.rank}/${data.total} ｜ 当前 ${fmt$(data.me.last)}（巅峰 ${fmt$(data.me.best)}）`;
+      $('boardMe').textContent = byBest
+        ? `我：${data.me.name} ｜ No.${data.me.rank}/${data.total} ｜ 巅峰 ${fmt$(data.me.best)}（当前 ${fmt$(data.me.last)}）`
+        : `我：${data.me.name} ｜ No.${data.me.rank}/${data.total} ｜ 当前 ${fmt$(data.me.last)}（巅峰 ${fmt$(data.me.best)}）`;
     }
-    $('boardSub').textContent = `按当前总资产实时排名 · ${data.total} 名交易员已上榜 · 成绩自报仅供娱乐`;
+    $('boardSub').textContent = byBest
+      ? `按历史最高总资产排名 · ${data.total} 名交易员已上榜 · 成绩自报仅供娱乐`
+      : `按当前总资产实时排名 · ${data.total} 名交易员已上榜 · 成绩自报仅供娱乐`;
   } catch (e) {
     box.textContent = '';
     const tip = document.createElement('div');
@@ -117,6 +129,15 @@ async function refreshBoard() {
     tip.textContent = '龙虎榜需要服务端支持：用 `npm start`（node tools/server.mjs）启动后即可联机排行。';
     box.appendChild(tip);
   }
+}
+
+function switchBoard(board) {
+  if (curBoard === board) return;
+  curBoard = board;
+  $('tabLive').classList.toggle('on', board === 'live');
+  $('tabBest').classList.toggle('on', board === 'best');
+  $('boardList').textContent = ''; // 清掉旧榜单，避免切页瞬间串数据
+  refreshBoard();
 }
 
 function showNameForm(prefill = '') {
@@ -173,6 +194,8 @@ export function initLeaderboard(getStatsFn) {
   $('nameSkip').onclick = () => closeBoard();
   $('boardRename').onclick = () => showNameForm(getPlayer()?.name || '');
   $('boardRefresh').onclick = () => refreshBoard();
+  $('tabLive').onclick = () => switchBoard('live');
+  $('tabBest').onclick = () => switchBoard('best');
 }
 
 // 页面隐藏/交易平仓时调用

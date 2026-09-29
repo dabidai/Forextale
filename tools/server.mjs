@@ -99,11 +99,15 @@ async function api(req, res, url) {
 
   if (url.pathname === '/api/leaderboard' && req.method === 'GET') {
     const token = url.searchParams.get('token');
-    const list = lb.topFor(50, token);
+    const byBest = url.searchParams.get('board') === 'best'; // 默认实时榜（按当前权益），best=巅峰榜（按历史最高）
+    const list = lb.topFor(50, token, byBest);
     const p = token ? lb.getPlayer(token) : null;
     return json(res, 200, {
       list,
-      me: p ? { name: p.name, best: p.best, last: p.last, trades: p.trades, rank: lb.rankOf(p.last) } : null,
+      me: p ? {
+        name: p.name, best: p.best, last: p.last, trades: p.trades,
+        rank: byBest ? lb.rankOfBest(p.best) : lb.rankOf(p.last),
+      } : null,
       total: lb.total(),
       updatedAt: now,
     });

@@ -30,10 +30,15 @@ export function openDb(path = ':memory:') {
       WHERE token = ?
     `),
     rank: db.prepare('SELECT COUNT(*) + 1 AS rk FROM players WHERE last > ?'),
+    rankBest: db.prepare('SELECT COUNT(*) + 1 AS rk FROM players WHERE best > ?'),
     total: db.prepare('SELECT COUNT(*) AS n FROM players'),
     top: db.prepare(`
       SELECT token, name, best, last, trades, updated_at FROM players
       ORDER BY last DESC, updated_at ASC LIMIT ?
+    `),
+    topBest: db.prepare(`
+      SELECT token, name, best, last, trades, updated_at FROM players
+      ORDER BY best DESC, updated_at ASC LIMIT ?
     `),
   };
 
@@ -55,6 +60,9 @@ export function openDb(path = ':memory:') {
     rankOf(last) {
       return q.rank.get(last).rk;
     },
+    rankOfBest(best) {
+      return q.rankBest.get(best).rk;
+    },
     total() {
       return q.total.get().n;
     },
@@ -62,8 +70,10 @@ export function openDb(path = ':memory:') {
       return q.top.all(n);
     },
     // 榜单里标记「这一行是不是我」：token 只留在服务端比对，不下发
-    topFor(n, myToken) {
-      return q.top.all(n).map((r) => ({ ...r, mine: myToken != null && r.token === myToken }));
+    // byBest=false 实时榜（按 last），true 巅峰榜（按 best）
+    topFor(n, myToken, byBest = false) {
+      const rows = byBest ? q.topBest.all(n) : q.top.all(n);
+      return rows.map((r) => ({ ...r, mine: myToken != null && r.token === myToken }));
     },
   };
 }
