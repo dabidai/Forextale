@@ -91,6 +91,26 @@ sudo nginx -t && sudo nginx -s reload
 sudo certbot --nginx -d game.example.com
 ```
 
+> **想挂在子路径下？**（如 `http://IP/forextale/`）把 `location /` 一段换成三段：
+>
+> ```nginx
+> location = /forextale { return 301 /forextale/$is_args$args; }
+> location /forextale/ {
+>     proxy_pass http://127.0.0.1:8123/;   # 末尾这个 / 会剥掉前缀，Node 无需任何改动
+>     proxy_set_header Host $host;
+>     proxy_set_header X-Real-IP $remote_addr;
+> }
+> location /api/ {                         # 龙虎榜前端写死绝对路径 /api/...，需单独转发
+>     proxy_pass http://127.0.0.1:8123/api/;
+>     proxy_set_header Host $host;
+>     proxy_set_header X-Real-IP $remote_addr;
+> }
+> ```
+>
+> 页面里的静态资源全是相对路径（`styles.css`、`src/...`），会自动落在子路径下，一个 `location /forextale/` 就覆盖全部资源，无需逐个配置。
+>
+> 想让游戏**只**从子路径进（根路径及其余路径一律 404）？再加一段 `location / { return 404; }`；`/api/` 段必须保留——龙虎榜前端写死了绝对路径 `/api/...`。
+
 ## 6. 防火墙 / 安全组
 
 - 云控制台安全组放行 **80 / 443**；
