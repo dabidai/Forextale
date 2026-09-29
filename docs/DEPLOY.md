@@ -142,6 +142,17 @@ cp /opt/forextale/data/forextale.db ~/backup/forextale-$(date +%F).db
 
    私钥 `deploy_key` 留在本地，下一步粘贴进 GitHub；用完可删除。
 
+   **Windows PowerShell 用户**（自带 ssh-keygen，但**没有** `ssh-copy-id`，装公钥用这条替代）：
+
+   ```powershell
+   ssh-keygen -t ed25519 -C "forextale-deploy" -f deploy_key
+   Get-Content .\deploy_key.pub | ssh user@你的服务器IP "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
+   # 把私钥复制到剪贴板，直接粘进 GitHub Secrets：
+   Get-Content .\deploy_key | Set-Clipboard
+   ```
+
+   若提示找不到 ssh-keygen：管理员 PowerShell 执行 `Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0` 安装（或装 Git for Windows，自带 OpenSSH）。
+
 2. **服务器上允许部署账号免密重启服务**（最小权限，只放行重启这一条命令；若直接用 root 登录可跳过）：
 
    ```bash

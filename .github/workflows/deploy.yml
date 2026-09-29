@@ -25,7 +25,8 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          # tr -d '\r'：容错 Windows 粘贴的私钥（CRLF → LF）
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new"
           # 同步代码到服务器（data/ 是玩家 SQLite 数据库，永不清除）
