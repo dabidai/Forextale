@@ -108,7 +108,7 @@ function wireMarket() {
     if (id === 'EURUSD') app.candlesSeen++;
     if (id === app.pairId) app.chart.request();
     if (++app.saveTick >= 4) { app.saveTick = 0; saveNow(); }
-    if (app.saveTick === 2 && !inBattle()) syncNow(); // 约 6 秒一次静默上榜
+    if (app.saveTick % 2 === 0 && !inBattle()) syncNow(); // 约 3 秒一次实时榜心跳
     updateMarginEst();
     renderSize();
     prologueCheck();
@@ -745,6 +745,7 @@ function init() {
   initLeaderboard(() => ({
     equity: app.engine.equity(app.prices),
     trades: app.save.tradeCount,
+    open: app.save.positions.length > 0,
   }));
 
   // PWA（仅 http/https 下生效）

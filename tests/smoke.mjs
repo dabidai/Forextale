@@ -256,7 +256,7 @@ const ok = (name) => console.log(`  ✓ ${name} (#${++n})`);
   ok('战役判定：胜利 / 存活 / 爆仓三档正确');
 }
 
-/* 18. 龙虎榜数据层：注册/改名/同步/排行 */
+/* 18. 龙虎榜数据层：注册/改名/同步/实时排行/巅峰保留 */
 {
   const { openDb } = await import('../tools/db.mjs');
   const db = openDb(':memory:');
@@ -267,21 +267,31 @@ const ok = (name) => console.log(`  ✓ ${name} (#${++n})`);
   const s1 = db.sync('token-aaaa-1111', 10850, 4, now + 2);
   assert.equal(s1.best, 10850, '上报创出新高');
   const s2 = db.sync('token-aaaa-1111', 9300, 5, now + 3);
-  assert.equal(s2.best, 10850, '回撤不降榜');
+  assert.equal(s2.best, 10850, '巅峰保留，回撤不降历史最高');
   assert.equal(s2.last, 9300, '记录当前权益');
   assert.equal(db.getPlayer('token-aaaa-1111').name, '小明二代', '改名生效');
   db.getOrCreatePlayer('token-bbbb-2222', '索罗斯门徒', now + 4);
   db.sync('token-bbbb-2222', 12345, 9, now + 5);
   db.getOrCreatePlayer('token-cccc-3333', '英镑猎手', now + 6);
-  db.sync('token-cccc-3333', 10850, 2, now + 7); // 与小明并列
+  db.sync('token-cccc-3333', 10850, 2, now + 7);
+  // 实时榜：按当前权益 last 排序（小明 9300 → 垫底）
   const board = db.topFor(50, 'token-aaaa-1111');
-  assert.equal(board[0].name, '索罗斯门徒');
-  assert.equal(board[1].mine, true, '标记出我自己那一行');
-  assert.equal(board[2].mine, false);
+  assert.equal(board[0].name, '索罗斯门徒', 'last 12345 第一');
+  assert.equal(board[1].name, '英镑猎手', 'last 10850 第二');
+  assert.equal(board[2].mine, true, '标记出我自己那一行');
   assert.equal(db.rankOf(12345), 1);
-  assert.equal(db.rankOf(10850), 2, '并列同分同名次');
+  assert.equal(db.rankOf(9300), 3);
   assert.equal(db.total(), 3);
-  ok('龙虎榜：注册/改名/同步取最高/按最高资产从大到小排名 ✓');
+  // 权益回升 → 实时升位；11000 创新高，巅峰同步上调
+  db.sync('token-aaaa-1111', 11000, 6, now + 8);
+  assert.equal(db.topFor(50, null)[1].name, '小明二代', '权益回升实时升位');
+  assert.equal(db.rankOf(11000), 2);
+  assert.equal(db.getPlayer('token-aaaa-1111').best, 11000, '新高同步上调巅峰');
+  // 回落但不破巅峰 → 巅峰保持
+  db.sync('token-aaaa-1111', 10500, 7, now + 9);
+  assert.equal(db.getPlayer('token-aaaa-1111').best, 11000, '回撤不动巅峰');
+  assert.equal(db.rankOf(10500), 3);
+  ok('龙虎榜：注册/改名/同步保留巅峰/按当前权益实时排名 ✓');
 }
 
 /* 19. 金额 ⇄ 手数换算 */

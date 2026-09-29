@@ -29,14 +29,18 @@ export async function register(name) {
 }
 
 let lastSync = 0;
+let lastSig = '';
 
-// 上报当前权益（内部节流 5s；战役模式由调用方跳过）
-export async function syncScore(equity, trades) {
+// 上报当前权益（内部节流 3s；无变化 15s 内跳过；战役模式由调用方跳过）
+export async function syncScore(equity, trades, open = false) {
   const cur = getPlayer();
   if (!cur) return;
   const now = Date.now();
-  if (now - lastSync < 5000) return;
+  if (now - lastSync < 3000) return;
+  const sig = `${equity}|${trades}|${open ? 1 : 0}`;
+  if (sig === lastSig && now - lastSync < 15000) return; // 空仓且没变化：偶尔报一次保活即可
   lastSync = now;
+  lastSig = sig;
   try {
     await fetch('/api/sync', {
       method: 'POST',
@@ -58,13 +62,14 @@ async function fetchBoard(token) {
 /* ---------- 弹窗 UI ---------- */
 
 let refreshTimer = null;
-let getStats = () => ({ equity: 10000, trades: 0 });
+let getStats = () => ({ equity: 10000, trades: 0, open: false });
 
 function rowEl(r, i) {
+  const stale = Date.now() - r.updated_at > 30000; // 超过 30s 没心跳视为离线，权益冻结在最后一次上报
   const div = document.createElement('div');
-  div.className = 'board-row' + (r.mine ? ' me' : '');
+  div.className = 'board-row' + (r.mine ? ' me' : '') + (stale ? ' offline' : '');
   const medal = ['🥇', '🥈', '🥉'][i] || `${i + 1}`;
-  const pnl = r.best - 10000;
+  const pnl = r.last - 10000;
   const when = new Date(r.updated_at);
   const tm = `${when.getMonth() + 1}/${when.getDate()} ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`;
   const left = document.createElement('div');
@@ -78,12 +83,12 @@ function rowEl(r, i) {
   left.append(rk, nm);
   const right = document.createElement('div');
   right.className = 'br-r';
-  const best = document.createElement('b');
-  best.textContent = fmt$(r.best);
+  const cur = document.createElement('b');
+  cur.textContent = fmt$(r.last);
   const sub = document.createElement('span');
   sub.className = 'br-sub' + (pnl >= 0 ? ' up' : ' down');
-  sub.textContent = `${fmt$(pnl, true)} · 当前 ${fmt$(r.last)} · ${r.trades}笔 · ${tm}`;
-  right.append(best, sub);
+  sub.textContent = `${fmt$(pnl)} · 巅峰 ${fmt$(r.best)} · ${r.trades}笔 · ${tm}${stale ? ' · 离线' : ''}`;
+  right.append(cur, sub);
   div.append(left, right);
   return div;
 }
@@ -102,9 +107,9 @@ async function refreshBoard() {
     $('boardMe').classList.toggle('hide', !data.me);
     if (data.me) {
       $('boardMe').textContent =
-        `我：${data.me.name} ｜ No.${data.me.rank}/${data.total} ｜ 最高 ${fmt$(data.me.best)}（当前 ${fmt$(data.me.last)}）`;
+        `我：${data.me.name} ｜ No.${data.me.rank}/${data.total} ｜ 当前 ${fmt$(data.me.last)}（巅峰 ${fmt$(data.me.best)}）`;
     }
-    $('boardSub').textContent = `按历史最高总资产排名 · ${data.total} 名交易员已上榜 · 成绩自报仅供娱乐`;
+    $('boardSub').textContent = `按当前总资产实时排名 · ${data.total} 名交易员已上榜 · 成绩自报仅供娱乐`;
   } catch (e) {
     box.textContent = '';
     const tip = document.createElement('div');
@@ -151,7 +156,7 @@ function openBoard() {
   clearInterval(refreshTimer);
   refreshTimer = setInterval(() => {
     if (!$('boardModal').classList.contains('hide') && getPlayer()) refreshBoard();
-  }, 8000);
+  }, 2000);
 }
 
 function closeBoard() {
@@ -172,6 +177,6 @@ export function initLeaderboard(getStatsFn) {
 
 // 页面隐藏/交易平仓时调用
 export function syncNow() {
-  const { equity, trades } = getStats();
-  syncScore(equity, trades);
+  const { equity, trades, open } = getStats();
+  syncScore(equity, trades, open);
 }

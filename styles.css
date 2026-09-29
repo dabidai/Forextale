@@ -371,6 +371,7 @@ body.tut-lock .app { pointer-events: none; }
 }
 .board-row:first-child { border-top: none; }
 .board-row.me { background: #fdf3dd; border-radius: 10px; padding-left: 10px; padding-right: 8px; }
+.board-row.offline { opacity: 0.45; } /* 超过 30s 无心跳：离线，权益冻结在最后一次上报 */
 .br-l { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .br-rank { width: 30px; text-align: center; font-size: 14px; }
 .br-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

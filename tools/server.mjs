@@ -61,11 +61,11 @@ async function readBody(req) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
 }
 
-// 简单限流：同 token 上报最小间隔 1.5s（休闲自榜，防手滑刷屏即可）
+// 简单限流：同 token 上报最小间隔 1s（实时榜心跳约 3s 一次，防手滑刷屏即可）
 const lastSeen = new Map();
 function tooFast(token) {
   const now = Date.now();
-  if (now - (lastSeen.get(token) || 0) < 1500) return true;
+  if (now - (lastSeen.get(token) || 0) < 1000) return true;
   lastSeen.set(token, now);
   if (lastSeen.size > 5000) lastSeen.clear();
   return false;
@@ -83,7 +83,7 @@ async function api(req, res, url) {
       ? body.token
       : randomUUID();
     const p = lb.getOrCreatePlayer(token, name, now);
-    return json(res, 200, { token, name: p.name, best: p.best, last: p.last, trades: p.trades, rank: lb.rankOf(p.best), total: lb.total() });
+    return json(res, 200, { token, name: p.name, best: p.best, last: p.last, trades: p.trades, rank: lb.rankOf(p.last), total: lb.total() });
   }
 
   if (url.pathname === '/api/sync' && req.method === 'POST') {
@@ -94,7 +94,7 @@ async function api(req, res, url) {
     const equity = cleanNum(body.equity, 0, 1e9, 10000);
     const trades = Math.round(cleanNum(body.trades, 0, 1e6, 0));
     const p = lb.sync(token, equity, trades, now);
-    return json(res, 200, { best: p.best, last: p.last, rank: lb.rankOf(p.best), total: lb.total() });
+    return json(res, 200, { best: p.best, last: p.last, rank: lb.rankOf(p.last), total: lb.total() });
   }
 
   if (url.pathname === '/api/leaderboard' && req.method === 'GET') {
@@ -103,7 +103,7 @@ async function api(req, res, url) {
     const p = token ? lb.getPlayer(token) : null;
     return json(res, 200, {
       list,
-      me: p ? { name: p.name, best: p.best, last: p.last, trades: p.trades, rank: lb.rankOf(p.best) } : null,
+      me: p ? { name: p.name, best: p.best, last: p.last, trades: p.trades, rank: lb.rankOf(p.last) } : null,
       total: lb.total(),
       updatedAt: now,
     });

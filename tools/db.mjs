@@ -1,5 +1,5 @@
 // 龙虎榜数据层：node:sqlite（Node ≥22.5 内置，零 npm 依赖）
-// 排名依据：best = 历史最高总资产（只涨不跌，鼓励成长）；last/trades 展示当前状态
+// 排名依据：last = 当前总权益（实时榜，客户端约 3s 心跳上报）；best = 历史最高，保留展示
 import { DatabaseSync } from 'node:sqlite';
 
 export function openDb(path = ':memory:') {
@@ -15,6 +15,7 @@ export function openDb(path = ':memory:') {
       created_at INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_players_best ON players(best DESC);
+    CREATE INDEX IF NOT EXISTS idx_players_last ON players(last DESC);
   `);
 
   const q = {
@@ -28,11 +29,11 @@ export function openDb(path = ':memory:') {
       UPDATE players SET best = MAX(best, ?), last = ?, trades = ?, updated_at = ?
       WHERE token = ?
     `),
-    rank: db.prepare('SELECT COUNT(*) + 1 AS rk FROM players WHERE best > ?'),
+    rank: db.prepare('SELECT COUNT(*) + 1 AS rk FROM players WHERE last > ?'),
     total: db.prepare('SELECT COUNT(*) AS n FROM players'),
     top: db.prepare(`
       SELECT token, name, best, last, trades, updated_at FROM players
-      ORDER BY best DESC, updated_at ASC LIMIT ?
+      ORDER BY last DESC, updated_at ASC LIMIT ?
     `),
   };
 
@@ -45,14 +46,14 @@ export function openDb(path = ':memory:') {
     getPlayer(token) {
       return q.get.get(token) ?? null;
     },
-    // 上报当前权益：best 只取历史最高，回撤不影响排名
+    // 上报当前权益：last 实时刷新（实时榜排名依据），best 只取历史最高保留
     sync(token, equity, trades, now) {
       if (!q.get.get(token)) return null;
       q.sync.run(equity, equity, trades, now, token);
       return q.get.get(token);
     },
-    rankOf(best) {
-      return q.rank.get(best).rk;
+    rankOf(last) {
+      return q.rank.get(last).rk;
     },
     total() {
       return q.total.get().n;
