@@ -34,6 +34,6 @@ jobs:
             --exclude 'data/' --exclude '.git/' --exclude '.github/' \
             -e "ssh $SSH_OPTS" \
             ./ "$SERVER_USER@$SERVER_HOST:/opt/forextale/"
-          # 重启服务（依赖服务器上的 sudoers 免密规则，见 docs/DEPLOY.md 第 10 节）
+          # 重启服务：自动兼容 root 登录（无 sudo）与普通用户 + sudoers 免密两种情况
           ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" \
-            "sudo systemctl restart forextale && systemctl is-active forextale"
+            "sudo -n systemctl restart forextale 2>/dev/null || systemctl restart forextale; systemctl is-active forextale"

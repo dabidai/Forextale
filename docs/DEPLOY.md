@@ -171,7 +171,9 @@ sudo chmod 440 /etc/sudoers.d/forextale-deploy
 exit
 ```
 
-说明：sudoers 命令里的 `user` 要改成**第 2 步 ssh 命令里用的那个用户名**（两处）；若你直接用 root 登录服务器，这一步整个跳过。这条规则只放行「重启 forextale 服务」一条命令，CI 拿着密钥也做不了别的事。
+说明：sudoers 命令里的 `user` 要改成**第 2 步 ssh 命令里用的那个用户名**（两处）；这条规则只放行「重启 forextale 服务」一条命令，CI 拿着密钥也做不了别的事。
+
+> **服务器只有 root 账户？** 更简单：上面整段只装 rsync（`apt install -y rsync`），sudoers 那两行**跳过**；第 4 步的 `SERVER_USER` 填 `root`。工作流已自动兼容 root（不用 sudo）。注意这把密钥等于服务器最高权限，务必只存在 GitHub Secrets 和本机 `.ssh` 里；想更稳妥可日后建一个普通部署用户。
 
 ### 第 4 步：把三个秘密配置进 GitHub
 
