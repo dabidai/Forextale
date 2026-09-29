@@ -1,0 +1,12 @@
+{
+  "name": "forextale",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "汇市物语 —— 原创外汇模拟交易科普小游戏（纯静态、无框架、无构建）",
+  "scripts": {
+    "start": "node tools/server.mjs",
+    "static": "node tools/serve.mjs",
+    "test": "node tests/smoke.mjs"
+  }
+}

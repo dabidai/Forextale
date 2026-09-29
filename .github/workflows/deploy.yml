@@ -1,0 +1,38 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: # 支持在 Actions 页面手动触发
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 冒烟测试（不通过不部署）
+        run: node tests/smoke.mjs
+
+      - name: 部署到服务器
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new"
+          # 同步代码到服务器（data/ 是玩家 SQLite 数据库，永不清除）
+          rsync -az --delete \
+            --exclude 'data/' --exclude '.git/' --exclude '.github/' \
+            -e "ssh $SSH_OPTS" \
+            ./ "$SERVER_USER@$SERVER_HOST:/opt/forextale/"
+          # 重启服务（依赖服务器上的 sudoers 免密规则，见 docs/DEPLOY.md 第 10 节）
+          ssh $SSH_OPTS "$SERVER_USER@$SERVER_HOST" \
+            "sudo systemctl restart forextale && systemctl is-active forextale"

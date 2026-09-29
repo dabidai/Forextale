@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>汇市物语 · 外汇模拟交易小游戏</title>
+<meta name="description" content="用几分钟学会做多、做空、杠杆和止损，在纯模拟盘里亲历外汇经典时刻。模拟游戏，不构成投资建议。">
+<meta name="theme-color" content="#2e8b74">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app" class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 48 48" aria-hidden="true">
+        <rect width="48" height="48" rx="12" fill="#2e8b74"/>
+        <line x1="14" y1="14" x2="14" y2="36" stroke="#f6f1e6" stroke-width="1.6"/><rect x="10.5" y="20" width="7" height="10" rx="1.5" fill="#f6f1e6"/>
+        <line x1="24" y1="8" x2="24" y2="30" stroke="#e0564b" stroke-width="1.6"/><rect x="20.5" y="11" width="7" height="11" rx="1.5" fill="#e0564b"/>
+        <line x1="34" y1="18" x2="34" y2="40" stroke="#2f9e77" stroke-width="1.6"/><rect x="30.5" y="24" width="7" height="12" rx="1.5" fill="#2f9e77"/>
+      </svg>
+      <div class="brand-txt">
+        <h1>汇市物语<span class="demo-badge">模拟盘</span></h1>
+      </div>
+    </div>
+    <div class="hdr-btns">
+      <button id="btnBoard" class="icon-btn" aria-label="龙虎榜" title="龙虎榜：全球玩家资产排行">🏆</button>
+      <button id="btnBattle" class="icon-btn" aria-label="经典战役" title="经典战役：亲历外汇史名场面">⚔</button>
+      <button id="btnMenu" class="icon-btn" aria-label="菜单">☰</button>
+    </div>
+  </header>
+
+  <section class="stats card">
+    <div class="stat"><span class="lbl">权益 <i class="term-dot" data-term="equity">ⓘ</i></span><b id="equityVal">–</b></div>
+    <div class="stat"><span class="lbl">余额</span><b id="balanceVal">–</b></div>
+    <div class="stat"><span class="lbl">可用 <i class="term-dot" data-term="free">ⓘ</i></span><b id="freeVal">–</b></div>
+    <div class="stat lv"><button id="levelBadge" class="lv-badge">Lv.1</button></div>
+  </section>
+
+  <div id="battleBar" class="battle-bar hide">
+    <span id="battleTitle" class="bb-title"></span>
+    <div class="bb-prog"><i id="battleProgFill"></i></div>
+    <button id="battleQuit" class="bb-quit">结束战役</button>
+  </div>
+
+  <section id="chartCard" class="card chart-card">
+    <div class="chart-head">
+      <div id="pairChips" class="pair-chips"></div>
+      <div class="sub-row">
+        <div class="price-line"><b id="priceBig">–</b><span id="priceChg" class="chg">–</span></div>
+        <span id="protChip" class="prot-chip hide">🛡 新手保护中</span>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="chartCanvas"></canvas></div>
+    <div id="chartInfo" class="chart-info">–</div>
+  </section>
+
+  <section class="card pos-card">
+    <div class="pos-tabs">
+      <button id="tabOpen" class="tab on">持仓 <span id="posCount" class="cnt">0</span></button>
+      <button id="tabHist" class="tab">历史</button>
+      <span class="tabs-hint">蓝色词条可点看解释</span>
+    </div>
+    <div id="posList" class="pos-list"></div>
+    <div id="histList" class="pos-list hide"></div>
+  </section>
+
+  <section id="tradeCard" class="card trade-card">
+    <div class="trade-grid">
+      <div class="field">
+        <span class="lbl">仓位 <i class="term-dot" data-term="lot">ⓘ</i><i class="term-dot" data-term="margin">ⓘ</i>
+          <span class="seg">
+            <button id="modeMoney" class="on">按金额</button><button id="modeLots">按手数</button>
+          </span>
+        </span>
+        <div class="stepper" id="moneyStepper">
+          <button id="moneyMinus" aria-label="减少">−</button>
+          <b id="moneyVal">$1,000</b>
+          <button id="moneyPlus" aria-label="增加">＋</button>
+        </div>
+        <div id="moneyChips" class="chips"></div>
+        <div class="stepper hide" id="lotStepper">
+          <button id="lotMinus" aria-label="减少">−</button>
+          <b id="lotVal">0.20</b>
+          <button id="lotPlus" aria-label="增加">＋</button>
+        </div>
+        <div id="lotChips" class="chips hide"></div>
+        <div id="sizeConv" class="size-conv">–</div>
+      </div>
+      <div class="field" id="levField">
+        <span class="lbl">杠杆 <i class="term-dot" data-term="leverage">ⓘ</i></span>
+        <div id="levChips" class="chips"></div>
+      </div>
+      <div class="field">
+        <span class="lbl">保护 <i class="term-dot" data-term="sl">ⓘ</i><i class="term-dot" data-term="tp">ⓘ</i></span>
+        <div id="protSummary" class="prot">自动：止损 −20点 · 止盈 +30点</div>
+        <div id="sltpInputs" class="sltp hide">
+          <label class="prot-toggle"><input id="protToggle" type="checkbox" checked> 自动保护</label>
+          <label>止损 <input id="slInput" type="number" value="20" min="1" max="500">点</label>
+          <label>止盈 <input id="tpInput" type="number" value="30" min="1" max="1000">点</label>
+        </div>
+      </div>
+    </div>
+    <div class="est-row">
+      <div class="est"><span class="term-inline" data-term="margin">保证金</span> <b id="marginEst">–</b></div>
+      <div class="est"><span class="term-inline" data-term="notional">名义价值</span> <b id="notionalEst">–</b></div>
+      <div class="est">可承受反向波动 <b id="tolEst">–</b></div>
+    </div>
+    <div class="trade-btns">
+      <button id="btnBuy" class="btn-trade buy">买涨<small id="buySub">做多 EUR/USD</small></button>
+      <button id="btnSell" class="btn-trade sell">买跌<small id="sellSub">做空 EUR/USD</small></button>
+    </div>
+  </section>
+
+  <footer class="foot">模拟游戏 · 行情与数据均为虚构 · 不构成任何投资建议</footer>
+</div>
+
+<!-- 弹层 -->
+<div id="eventCard" class="event-card hide"></div>
+<div id="settle" class="settle hide"></div>
+<div id="lvToast" class="lv-toast hide"></div>
+<div id="toast" class="toast hide"></div>
+
+<div id="liqOverlay" class="liq hide">
+  <div class="liq-card">
+    <h3>💥 爆仓了</h3>
+    <p>权益跌到<span class="term-inline" data-term="blowup">已用保证金</span>的 80% 以下，触发强制平仓线，所有持仓被系统自动砍掉。</p>
+    <p id="liqDetail" class="liq-detail"></p>
+    <p class="liq-tip">下次试试更小的手数或更低的杠杆；带好止损，离爆仓线远一点。</p>
+    <button id="liqOk" class="btn-main">知道了，继续</button>
+  </div>
+</div>
+
+<div id="termSheet" class="sheet hide">
+  <div class="sheet-scrim"></div>
+  <div class="sheet-card">
+    <h3 id="termTitle"></h3>
+    <p id="termBody" class="term-desc"></p>
+    <p id="termExample" class="term-eg"></p>
+    <button id="termClose" class="btn-main">明白了</button>
+  </div>
+</div>
+
+<div id="menuModal" class="modal hide">
+  <div class="modal-card">
+    <button id="miRestart">🔄 重新开始</button>
+    <button id="miAbout">📖 关于本游戏</button>
+    <button id="miClose" class="muted">关闭</button>
+  </div>
+</div>
+
+<div id="confirmModal" class="modal hide">
+  <div class="modal-card">
+    <p class="confirm-txt">确定重新开始？当前进度与存档将被清空。</p>
+    <button id="cfYes" class="danger">清空重来</button>
+    <button id="cfNo" class="muted">取消</button>
+  </div>
+</div>
+
+<div id="aboutModal" class="modal hide">
+  <div class="modal-card about">
+    <h3>汇市物语</h3>
+    <p>一款原创外汇模拟交易科普小游戏。行情由本地算法模拟生成，全程使用虚拟资金。</p>
+    <p>代码、文案与美术均为原创；机制仅用于科普杠杆交易的风险，不构成任何投资建议。</p>
+    <button id="abClose" class="btn-main">关闭</button>
+  </div>
+</div>
+
+<div id="battleModal" class="modal hide">
+  <div class="modal-card battle-list">
+    <h3>⚔ 经典战役</h3>
+    <p class="bl-sub">亲历真实外汇史上的名场面。行情为按史实演绎的教学化重演，非逐笔真实数据。</p>
+    <div id="battleItems"></div>
+    <button id="battleClose" class="muted">关闭</button>
+  </div>
+</div>
+
+<div id="battleIntroModal" class="modal hide">
+  <div class="modal-card battle-intro">
+    <h3 id="biTitle"></h3>
+    <p class="bi-sub" id="biSub"></p>
+    <p class="bi-brief" id="biBrief"></p>
+    <p class="bi-goal" id="biGoal"></p>
+    <button id="biGo" class="btn-main">进入战场</button>
+    <button id="biCancel" class="muted">再想想</button>
+  </div>
+</div>
+
+<div id="battleResultModal" class="modal hide">
+  <div class="modal-card battle-result">
+    <h3 id="brTitle"></h3>
+    <div class="num" id="brPnl"></div>
+    <p class="br-epilogue" id="brEpilogue"></p>
+    <p class="br-best" id="brBest"></p>
+    <button id="brClose" class="btn-main">返回交易室</button>
+  </div>
+</div>
+
+<div id="boardModal" class="modal hide">
+  <div class="modal-card board-card">
+    <h3>🏆 汇市龙虎榜</h3>
+    <p class="board-sub" id="boardSub">按历史最高总资产排名</p>
+    <div id="nameForm" class="hide">
+      <p class="name-hint">给自己起一个交易员代号，和全网玩家比一比谁的钱包最鼓。</p>
+      <input id="nameInput" maxlength="12" placeholder="代号，如：英镑狙击手">
+      <p id="nameErr" class="name-err hide"></p>
+      <button id="nameGo" class="btn-main">上榜</button>
+      <button id="nameSkip" class="muted">先不了</button>
+    </div>
+    <div id="boardBody" class="hide">
+      <div id="boardMe" class="board-me hide"></div>
+      <div id="boardList" class="board-list"><div class="empty">加载中…</div></div>
+    </div>
+    <div class="board-btns">
+      <button id="boardRename" class="muted">改名</button>
+      <button id="boardRefresh" class="muted">刷新</button>
+      <button id="boardClose" class="btn-main">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新手引导 -->
+<div id="tutLayer" class="tut hide">
+  <div id="tutSpot" class="tut-spot"></div>
+  <div id="tutCard" class="tut-card">
+    <div id="tutStep" class="tut-step"></div>
+    <h3 id="tutTitle"></h3>
+    <p id="tutBody"></p>
+    <div class="tut-btns">
+      <button id="tutSkip" class="tut-skip">跳过教程</button>
+      <button id="tutNext" class="tut-next">下一步</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="src/ui/app.js"></script>
+</body>
+</html>

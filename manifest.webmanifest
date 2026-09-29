@@ -1,0 +1,13 @@
+{
+  "name": "汇市物语",
+  "short_name": "汇市物语",
+  "description": "原创外汇模拟交易科普小游戏。模拟盘，不构成投资建议。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f1e6",
+  "theme_color": "#2e8b74",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

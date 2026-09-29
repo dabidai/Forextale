@@ -1,0 +1,11 @@
+# 玩家数据库与本地测试产物——绝不能提交到 GitHub
+data/
+*.db
+tests/save-backup.json
+
+node_modules/
+*.log
+.DS_Store
+
+# 部署密钥（万一误生成）
+deploy_key*
