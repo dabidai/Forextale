@@ -123,3 +123,50 @@ cp /opt/forextale/data/forextale.db ~/backup/forextale-$(date +%F).db
 - 龙虎榜成绩由客户端自报（服务端有数值范围校验与 1.5 秒限流），休闲自榜机制，防不了作弊，仅供娱乐；
 - 昵称做了字符白名单 + 长度截断，数据库全程预编译语句，前端渲染昵称走 `textContent`，无 XSS/注入面；
 - 若要公网开放，建议再加一层 nginx 限流（`limit_req`）兜底。
+
+## 10. 自动部署（GitHub → 服务器）
+
+仓库里已内置工作流文件 `.github/workflows/deploy.yml`：每次 push 到 `main` 分支，GitHub 会自动跑冒烟测试 → 通过后用 rsync 把代码同步到服务器并重启服务（约 30 秒上线）。玩家数据库 `data/forextale.db` 在同步排除名单里，**永远不会被部署覆盖**。
+
+一次性配置（共 5 步）：
+
+1. **准备部署密钥**（在任意机器执行，一路回车不设密码）：
+
+   ```bash
+   ssh-keygen -t ed25519 -C "forextale-deploy" -f deploy_key
+   # 把公钥追加到服务器部署用户的 authorized_keys（user 换成你的 SSH 用户名）
+   ssh-copy-id -i deploy_key.pub user@你的服务器IP
+   # 服务器上确认 rsync 已安装
+   sudo apt install rsync
+   ```
+
+   私钥 `deploy_key` 留在本地，下一步粘贴进 GitHub；用完可删除。
+
+2. **服务器上允许部署账号免密重启服务**（最小权限，只放行重启这一条命令；若直接用 root 登录可跳过）：
+
+   ```bash
+   echo "user ALL=(root) NOPASSWD: /usr/bin/systemctl restart forextale" | sudo tee /etc/sudoers.d/forextale-deploy
+   sudo chmod 440 /etc/sudoers.d/forextale-deploy
+   ```
+
+3. **GitHub 仓库配置 3 个 Secret**：仓库页 → Settings → Secrets and variables → Actions → New repository secret：
+
+   | Secret 名 | 值 |
+   |---|---|
+   | `SSH_PRIVATE_KEY` | `deploy_key` 私钥全文（含 BEGIN/END 两行） |
+   | `SERVER_HOST` | 服务器 IP 或域名 |
+   | `SERVER_USER` | SSH 登录用户名 |
+
+4. **首次推送代码**（本机）：
+
+   ```bash
+   git init && git add . && git commit -m "init"
+   git branch -M main
+   git remote add origin https://github.com/你的用户名/forextale.git
+   git push -u origin main
+   ```
+
+5. **完成**。此后每次 `git push` 自动部署；仓库 Actions 页可看实时日志，也可手动触发（workflow_dispatch）。
+
+> 注意：确保第 4 节的 systemd 服务已就位（工作流只负责同步与重启，服务安装是第 2–4 节的一次性工作）；`.gitignore` 已把 `data/` 排除在 Git 之外，玩家数据不会被误提交。
+
